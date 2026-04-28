@@ -190,12 +190,26 @@ fi
 # ---------------------------------------------------------------------------
 log "[7/N] Verifying GitHub fork + cloning repos..."
 
-if ! curl -fsS -o /dev/null \
+# Use GH_TOKEN if it's already populated in env (the bot's PAT) so we can
+# see private forks. Falls back to unauth (works only if the fork is public).
+GH_TOKEN_VAL=$(grep "^GH_TOKEN=" /etc/ralph/env 2>/dev/null | cut -d= -f2-)
+fork_check_args=()
+if [[ -n "$GH_TOKEN_VAL" && "$GH_TOKEN_VAL" != *REPLACE* ]]; then
+  fork_check_args=(-H "Authorization: Bearer $GH_TOKEN_VAL")
+fi
+
+if ! curl -fsS "${fork_check_args[@]}" -o /dev/null \
        "https://api.github.com/repos/MeshOMatic/meshcore-planner"; then
-  warn "MeshOMatic/meshcore-planner fork not found on GitHub."
+  warn "MeshOMatic/meshcore-planner fork not found (or token can't see it)."
   warn "Log in as MeshOMatic on github.com, fork akkerkid/meshcore-planner, then re-run."
   warn "(Skipping clones for now — re-run once fork exists.)"
 else
+  # Configure a credential helper for the bot user so HTTPS clones to
+  # private repos work without interactive prompt.
+  sudo -u bot bash -c "
+    git config --global credential.helper '!f() { test \"\$1\" = get && echo \"username=meshomatic\" && echo \"password=$GH_TOKEN_VAL\"; }; f'
+  "
+
   sudo -u bot bash -c '
     set -e
     mkdir -p ~/work
@@ -211,7 +225,7 @@ else
       git fetch -q upstream
       git checkout -q main
       git reset -q --hard upstream/main
-      echo "Cloned MeshOMatic/meshcore-planner with upstream remote pointing at akkerkid/meshcore-planner"
+      echo "Cloned MeshOMatic/meshcore-planner with upstream pointing at akkerkid/meshcore-planner"
     fi
   '
   log "Clones in /home/bot/work/:"
@@ -361,6 +375,33 @@ EOF
   systemctl enable --now bot-data-rsync.timer >/dev/null 2>&1
   log "rsync timer enabled — next runs:"
   systemctl list-timers bot-data-rsync.timer --no-pager 2>&1 | head -3
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 10: bootstrap.md, cadence.sh, loop.sh, helpers
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Phase 9b: Python venv + pytest for the bot (so it can verify its own work)
+# ---------------------------------------------------------------------------
+log "[9b/N] Installing python build deps + venv with pytest..."
+
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    libpq-dev libgdal-dev libproj-dev gdal-bin python3-dev \
+    >/dev/null
+
+if [[ -d /home/bot/work/meshcore-planner ]]; then
+  if [[ ! -d /home/bot/work/meshcore-planner/.venv ]]; then
+    sudo -u bot bash -c '
+      cd /home/bot/work/meshcore-planner
+      python3 -m venv .venv
+      .venv/bin/pip install -q --upgrade pip pytest
+    '
+    log "venv created with pytest at /home/bot/work/meshcore-planner/.venv"
+  else
+    log "venv already exists at /home/bot/work/meshcore-planner/.venv"
+  fi
+else
+  warn "meshcore-planner not yet cloned; skipping venv setup"
 fi
 
 # ---------------------------------------------------------------------------
