@@ -1,0 +1,20 @@
+[Unit]
+Description=Ralph autonomous Claude Code loop
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/bot/work/meshcore-planner
+EnvironmentFile=/etc/ralph/env
+ExecStart=/opt/ralph/loop.sh
+Restart=always
+RestartSec=30
+RuntimeMaxSec=86400
+StandardOutput=append:/var/log/ralph/stdout.log
+StandardError=append:/var/log/ralph/stderr.log
+
+[Install]
+WantedBy=multi-user.target
