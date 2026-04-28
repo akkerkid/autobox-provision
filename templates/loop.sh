@@ -41,10 +41,14 @@ while true; do
   trap 'rm -f "$claude_out"' EXIT
 
   # Fresh session, 90 min cap, dangerous-skip-perms (allowlisted network is the safety).
+  # The "Begin." user-prompt triggers Phase 1 of the bootstrap; without a user
+  # prompt, claude --print exits immediately with "Input must be provided".
   timeout 5400 sudo -u bot \
     bash -c "
       cd /home/bot/work/meshcore-planner
-      claude --print --dangerously-skip-permissions \
+      git config --global --add safe.directory /home/bot/work/bot-rules
+      git config --global --add safe.directory /home/bot/work/meshcore-planner
+      echo 'Begin your iteration.' | claude --print --dangerously-skip-permissions \
              --append-system-prompt \"\$(cat /etc/ralph/bootstrap.md)\"
     " > "$claude_out" 2> >(tee -a "$STDERR_TAIL" >&2)
   exit_code=$?
