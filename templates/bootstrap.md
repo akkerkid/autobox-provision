@@ -13,6 +13,7 @@ Read these now, in order:
 - /home/bot/work/bot-rules/05-respect-locks.md
 - /home/bot/work/bot-rules/06-feasibility-check.md
 - /home/bot/work/bot-rules/07-no-secrets.md
+- /home/bot/work/bot-rules/08-rebase-and-retest.md
 
 If anything in your work conflicts with these, the rules win.
 
